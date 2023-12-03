@@ -34,15 +34,20 @@ def log_sleep(msg, lower, upper):
     Returns
         float: The sleep duration.
     """
-    amount = random.uniform(lower, upper)
-    if amount > 3600:
-        logging.info(f"{msg} Sleeping for {amount / 3600} hours")
-    elif amount > 60:
-        logging.info(f"{msg} Sleeping for {amount / 60} minutes")
+    if lower > 0:
+        amount = random.uniform(lower, upper)
+        if amount > 3600:
+            logging.info(f"{msg}. Sleeping for {amount / 3600} hours")
+        elif amount > 60:
+            logging.info(f"{msg}. Sleeping for {amount / 60} minutes")
+        else:
+            logging.info(f"{msg}. Sleeping for {amount} seconds")
+        time.sleep(amount)
+        return amount
     else:
-        logging.info(f"{msg} Sleeping for {amount} seconds")
-    time.sleep(amount)
-    return amount
+        er_msg = "Alert! Lower bound is less than zero. Changed (lower, upper) to (60, 120)"
+        log_sleep(msg, 60, 120)
+
 ######################################
 ######################################
 
