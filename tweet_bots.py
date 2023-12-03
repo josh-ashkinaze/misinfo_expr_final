@@ -109,7 +109,7 @@ def log_bot_status(username, status):
         str: Status message indicating the result of the insert operation.
     """
     rows_to_insert = [
-        {"bot_username": username, "status": status, "dt": datetime.utcnow().replace(tzinfo=pytz.utc).astimezone(pytz.timezone("US/Eastern")).isoformat()}
+        {"bot_username": username, "status": status, "dt": datetime.utcnow().isoformat()}
     ]
     errors = BIGQUERY_CLIENT.insert_rows_json(BOT_TABLE_ID, rows_to_insert)
     if errors == []:
@@ -172,7 +172,9 @@ def parse_bot_statuses(bot_statuses, check_again_after=60 * 60 * 24):
         # if last unsuccessful action was a long time ago...we will try again
         else:
             logging.info(f"Bot {info['username']} was logged as dead with error code {info['status']} on {info['dt']}")
-            if ( datetime.utcnow().replace(tzinfo=pytz.utc).astimezone(pytz.timezone("US/Eastern")).isoformat() - info['dt']).total_seconds() > check_again_after:
+            current_time = datetime.utcnow()
+            time_difference = (current_time - info['dt']).total_seconds()
+            if (time_difference >= check_again_after):
                 logging.info(
                     f"Bot {info['username']} was last tried more than {check_again_after / (60 * 60)} hours ago. Checking again.")
                 alive_bots.append(info['username'])
@@ -257,10 +259,10 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Tweet summarizer for academic papers")
     parser.add_argument('--n_per_day', type=int, default=30, help='Number of tweets per day')
-    parser.add_argument('--short_sleep_min', type=float, default=60 * 3, help='Minimum short sleep duration in seconds')
-    parser.add_argument('--short_sleep_max', type=float, default=60 * 5,
+    parser.add_argument('--short_sleep_min', type=float, default=60 * 5, help='Minimum short sleep duration in seconds')
+    parser.add_argument('--short_sleep_max', type=float, default=60 * 7,
                         help='Maximum short sleep duration in seconds')
-    parser.add_argument('--long_sleep_noise', type=float, default=60 * 20,
+    parser.add_argument('--long_sleep_noise', type=float, default=60 * 3,
                         help='Noise for long sleep duration in seconds')
     args = parser.parse_args()
     main(args)

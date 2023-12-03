@@ -42,7 +42,11 @@ def insert_bots(credentials, bot_usernames):
     # Prepare the INSERT query
     table_id = "twitexpr.twit.bots"
     rows_to_insert = [
-        {"bot_username": username, "status": "success", "dt": datetime.utcnow().replace(tzinfo=pytz.utc).astimezone(pytz.timezone("US/Eastern")).isoformat()}
+        {
+            "bot_username": username,
+            "status": "success",
+            "dt": datetime.utcnow().isoformat()
+        }
         for username in bot_usernames
     ]
 
