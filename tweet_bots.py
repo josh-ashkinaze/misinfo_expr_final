@@ -258,7 +258,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Tweet summarizer for academic papers")
-    parser.add_argument('--n_per_day', type=int, default=30, help='Number of tweets per day')
+    parser.add_argument('--n_per_day', type=int, default=20, help='Number of tweets per day')
     parser.add_argument('--short_sleep_min', type=float, default=60 * 5, help='Minimum short sleep duration in seconds')
     parser.add_argument('--short_sleep_max', type=float, default=60 * 7,
                         help='Maximum short sleep duration in seconds')
