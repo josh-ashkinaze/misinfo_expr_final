@@ -49,9 +49,8 @@ def insert_bots(credentials, bot_usernames):
     errors = client.insert_rows_json(table_id, rows_to_insert)
     if errors == []:
         logging.info("Added bot data")
-        print("New rows have been added.")
     else:
-        print("Errors occurred while inserting rows: {}".format(errors))
+        logging.info("Errors occurred while inserting rows: {}".format(errors))
 
 
 def main():
