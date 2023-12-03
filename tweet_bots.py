@@ -100,7 +100,7 @@ def log_bot_status(username, status):
     ]
     errors = BIGQUERY_CLIENT.insert_rows_json(BOT_TABLE_ID, rows_to_insert)
     if errors == []:
-        logging.info("Added bot data")
+        pass
     else:
         logging.info("Errors occurred while inserting rows: {}".format(errors))
 
