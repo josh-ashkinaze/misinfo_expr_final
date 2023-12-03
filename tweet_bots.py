@@ -1,3 +1,14 @@
+"""
+Author: Joshua Ashkinaze
+Date: 2023-12-03
+
+Description: Main script for messaging people.
+
+ToDo
+
+Sub in the script to read msgs from input file
+"""
+
 import argparse
 import logging
 import os
@@ -8,6 +19,8 @@ import tweepy
 from google.cloud import bigquery
 import math
 import json
+import pytz
+
 
 from helpers import log_sleep, get_chatgpt_tweet, parse_arxiv_urls, clean_chatgpt_tweet, load_credentials
 
@@ -96,7 +109,7 @@ def log_bot_status(username, status):
         str: Status message indicating the result of the insert operation.
     """
     rows_to_insert = [
-        {"bot_username": username, "status": status, "dt": datetime.utcnow().isoformat()}
+        {"bot_username": username, "status": status, "dt": datetime.utcnow().replace(tzinfo=pytz.utc).astimezone(pytz.timezone("US/Eastern")).isoformat()}
     ]
     errors = BIGQUERY_CLIENT.insert_rows_json(BOT_TABLE_ID, rows_to_insert)
     if errors == []:
@@ -159,7 +172,7 @@ def parse_bot_statuses(bot_statuses, check_again_after=60 * 60 * 24):
         # if last unsuccessful action was a long time ago...we will try again
         else:
             logging.info(f"Bot {info['username']} was logged as dead with error code {info['status']} on {info['dt']}")
-            if (datetime.utcnow() - info['dt']).total_seconds() > check_again_after:
+            if ( datetime.utcnow().replace(tzinfo=pytz.utc).astimezone(pytz.timezone("US/Eastern")).isoformat() - info['dt']).total_seconds() > check_again_after:
                 logging.info(
                     f"Bot {info['username']} was last tried more than {check_again_after / (60 * 60)} hours ago. Checking again.")
                 alive_bots.append(info['username'])
@@ -167,6 +180,32 @@ def parse_bot_statuses(bot_statuses, check_again_after=60 * 60 * 24):
                 logging.info(f"Bot death of {info['username']} was too recent. Not checking again.")
     return alive_bots
 
+def calc_long_sleep_duration(N_PER_DAY, alive_bots, short_sleep_min, short_sleep_max):
+    """
+    Calculcates the long sleep duration.
+
+    There are two sleeps:
+
+    while running:
+        foreach bot:
+            pick action
+            short_sleep()
+            do action
+        long_sleep()
+
+    Short_sleep is a parameter from the script and long_sleep() is calculcated
+    to make sure we hit N_PER_DAY tweets per day.
+
+    """
+    daily_seconds = 60*60*24
+
+    short_sleep_mean = (short_sleep_min + short_sleep_max) / 2
+    sum_short_sleeps = short_sleep_mean * N_PER_DAY * len(alive_bots)
+
+    available_daily_seconds = daily_seconds - sum_short_sleeps
+    long_sleep_duration = math.ceil(available_daily_seconds / N_PER_DAY)
+
+    return long_sleep_duration
 
 def main(args):
     """
@@ -177,18 +216,16 @@ def main(args):
     """
     logging.info(f"Starting up with args {args}")
     N_PER_DAY = args.n_per_day
-    LONG_SLEEP_DURATION = math.ceil(86400 / N_PER_DAY)
     twitter_accounts = secrets['twitter_accounts']
     MSGS_ATTEMPTED = 0
 
-    while MSGS_ATTEMPTED <= 2:
+    while MSGS_ATTEMPTED <= N_PER_DAY:
 
         # Get bot statuses
-        bot_statuses = get_bot_statuses()
-        alive_bot_usernames = parse_bot_statuses(bot_statuses)
+        alive_bot_usernames = parse_bot_statuses(get_bot_statuses())
         logging.info(f"Alive bots: {alive_bot_usernames}")
         alive_bot_info = {username: twitter_accounts[username] for username in alive_bot_usernames}
-
+        LONG_SLEEP_DURATION = calc_long_sleep_duration(N_PER_DAY, alive_bot_usernames, args.short_sleep_min, args.short_sleep_max)
         try:
             # Scrape arxiv preprints for misinfo and post tweet
             logging.info(f"Starting tweet {MSGS_ATTEMPTED + 1} of {N_PER_DAY}")
@@ -219,9 +256,9 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Tweet summarizer for academic papers")
-    parser.add_argument('--n_per_day', type=int, default=2, help='Number of tweets per day')
-    parser.add_argument('--short_sleep_min', type=float, default=60 * 5, help='Minimum short sleep duration in seconds')
-    parser.add_argument('--short_sleep_max', type=float, default=60 * 10,
+    parser.add_argument('--n_per_day', type=int, default=30, help='Number of tweets per day')
+    parser.add_argument('--short_sleep_min', type=float, default=60 * 3, help='Minimum short sleep duration in seconds')
+    parser.add_argument('--short_sleep_max', type=float, default=60 * 5,
                         help='Maximum short sleep duration in seconds')
     parser.add_argument('--long_sleep_noise', type=float, default=60 * 20,
                         help='Noise for long sleep duration in seconds')

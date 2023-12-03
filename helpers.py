@@ -6,11 +6,9 @@ Description: Helper functions for unfollowing project
 """
 import json
 import logging
-import os
 import random
 import requests
 import time
-from google.cloud import bigquery
 from google.oauth2 import service_account
 from bs4 import BeautifulSoup
 from openai import OpenAI

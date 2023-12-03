@@ -4,6 +4,7 @@ from google.oauth2 import service_account
 from datetime import datetime
 import logging
 import os
+import pytz
 
 LOG_FORMAT = '%(asctime)s %(levelname)s: %(message)s'
 logging.basicConfig(filename=f'{os.path.basename(__file__)}.log', level=logging.INFO, format=LOG_FORMAT,
@@ -41,7 +42,7 @@ def insert_bots(credentials, bot_usernames):
     # Prepare the INSERT query
     table_id = "twitexpr.twit.bots"
     rows_to_insert = [
-        {"bot_username": username, "status": "success", "dt": datetime.utcnow().isoformat()}
+        {"bot_username": username, "status": "success", "dt": datetime.utcnow().replace(tzinfo=pytz.utc).astimezone(pytz.timezone("US/Eastern")).isoformat()}
         for username in bot_usernames
     ]
 
