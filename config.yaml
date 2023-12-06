@@ -12,3 +12,6 @@ long_sleep_noise: 3
 
 # is_test
 is_test: False
+
+# What percent of tweets should be tweeting an article
+gpt_percent: 0.05
