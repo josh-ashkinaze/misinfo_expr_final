@@ -12,7 +12,7 @@ import time
 from google.oauth2 import service_account
 from bs4 import BeautifulSoup
 from openai import OpenAI
-
+from datetime import datetime, timedelta
 
 with open('secrets.json') as json_file:
     secrets = json.load(json_file)
@@ -25,7 +25,7 @@ client = OpenAI(api_key=secrets["open_ai_key"])
 ######################################
 def log_sleep(msg, lower, upper):
     """
-    Logs the sleep duration.
+    Logs the sleep duration and the expected resume time.
 
     Args:
         msg (str): The message to be logged
@@ -34,19 +34,26 @@ def log_sleep(msg, lower, upper):
     Returns
         float: The sleep duration.
     """
-    if lower > 0:
-        amount = random.uniform(lower, upper)
-        if amount > 3600:
-            logging.info(f"{msg}. Sleeping for {amount / 3600} hours")
-        elif amount > 60:
-            logging.info(f"{msg}. Sleeping for {amount / 60} minutes")
-        else:
-            logging.info(f"{msg}. Sleeping for {amount} seconds")
-        time.sleep(amount)
-        return amount
+    if lower <= 0:
+        logging.info("Alert! Lower bound is less than or equal to zero. Changing (lower, upper) to (60, 120)")
+        lower, upper = 60, 120
+
+    amount = random.uniform(lower, upper)
+
+    # Calculate and format the resume time
+    resume_time = datetime.now() + timedelta(seconds=amount)
+    formatted_resume_time = resume_time.strftime('%Y-%m-%d %H:%M:%S')
+
+    # Log the sleep duration and resume time
+    if amount > 3600:
+        logging.info(f"{msg}. Sleeping for {amount / 3600:.3f} hours. Will resume at {formatted_resume_time}")
+    elif amount > 60:
+        logging.info(f"{msg}. Sleeping for {amount / 60:.3f} minutes. Will resume at {formatted_resume_time}")
     else:
-        er_msg = "Alert! Lower bound is less than zero. Changed (lower, upper) to (60, 120)"
-        log_sleep(msg, 60, 120)
+        logging.info(f"{msg}. Sleeping for {amount:.3f} seconds. Will resume at {formatted_resume_time}")
+
+    time.sleep(amount)
+    return amount
 
 ######################################
 ######################################
