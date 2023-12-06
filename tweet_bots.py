@@ -19,10 +19,11 @@ import tweepy
 from google.cloud import bigquery
 import math
 import json
-import pytz
+import yaml
 
 
-from helpers import log_sleep, get_chatgpt_tweet, parse_arxiv_urls, clean_chatgpt_tweet, load_credentials
+
+from helpers import log_sleep, get_chatgpt_tweet, parse_arxiv_urls, clean_chatgpt_tweet, load_credentials, read_config
 
 # Set up logging
 current_time = datetime.now().strftime('%Y_%m_%d__%H.%M.%S')
@@ -39,7 +40,7 @@ with open('secrets.json') as json_file:
 BG_CREDS, TWITTER_USERNAMES = load_credentials("secrets.json")
 BIGQUERY_CLIENT = bigquery.Client(credentials=BG_CREDS, project=BG_CREDS.project_id)
 BOT_TABLE_ID = 'twitexpr.twit.bots'
-
+CONFIG = read_config("config.yaml")
 
 def post_tweet(account_info, post_text):
     """
@@ -182,7 +183,7 @@ def parse_bot_statuses(bot_statuses, check_again_after=60 * 60 * 24):
                 logging.info(f"Bot death of {info['username']} was too recent. Not checking again.")
     return alive_bots
 
-def calc_long_sleep_duration(N_PER_DAY, alive_bots, short_sleep_min, short_sleep_max):
+def calc_long_sleep_duration(N_PER_DAY, alive_bots, short_sleep):
     """
     Calculcates the long sleep duration.
 
@@ -201,23 +202,23 @@ def calc_long_sleep_duration(N_PER_DAY, alive_bots, short_sleep_min, short_sleep
     """
     daily_seconds = 60*60*24
 
-    short_sleep_mean = (short_sleep_min + short_sleep_max) / 2
-    sum_short_sleeps = short_sleep_mean * N_PER_DAY * len(alive_bots)
+    # sum short sleeps in seconds
+    sum_short_sleeps = 60 * short_sleep * N_PER_DAY * len(alive_bots)
 
     available_daily_seconds = daily_seconds - sum_short_sleeps
     long_sleep_duration = math.ceil(available_daily_seconds / N_PER_DAY)
 
     return long_sleep_duration
 
-def main(args):
+def main():
     """
     Main function to run the script.
 
     Args:
         args: Command-line arguments.
     """
-    logging.info(f"Starting up with args {args}")
-    N_PER_DAY = args.n_per_day
+    logging.info(f"Starting up with args {CONFIG}")
+    N_PER_DAY = CONFIG['n_per_day']
     twitter_accounts = secrets['twitter_accounts']
     MSGS_ATTEMPTED = 0
 
@@ -227,7 +228,7 @@ def main(args):
         alive_bot_usernames = parse_bot_statuses(get_bot_statuses())
         logging.info(f"Alive bots: {alive_bot_usernames}")
         alive_bot_info = {username: twitter_accounts[username] for username in alive_bot_usernames}
-        LONG_SLEEP_DURATION = calc_long_sleep_duration(N_PER_DAY, alive_bot_usernames, args.short_sleep_min, args.short_sleep_max)
+        LONG_SLEEP_DURATION = calc_long_sleep_duration(N_PER_DAY, alive_bot_usernames, CONFIG['short_sleep'])
         try:
             # Scrape arxiv preprints for misinfo and post tweet
             logging.info(f"Starting tweet {MSGS_ATTEMPTED + 1} of {N_PER_DAY}")
@@ -242,27 +243,21 @@ def main(args):
             for account in alive_bot_info:
                 account_info = alive_bot_info[account]
                 logging.info(f"Tweeting from {account_info['username']}")
-                log_sleep(msg="Short sleep before this bot ChatGPT tweets.", lower=args.short_sleep_min,
-                          upper=args.short_sleep_max)
+                log_sleep(msg="Short sleep before this bot ChatGPT tweets.",
+                          lower=60*(CONFIG['short_sleep'] - CONFIG['short_sleep_noise']),
+                          upper=60*(CONFIG['short_sleep'] + CONFIG['short_sleep_noise']))
                 status = post_tweet(account_info, chatgpt_tweet)
                 log_bot_status(account_info['username'], status)
 
             MSGS_ATTEMPTED += 1
             log_sleep(msg="Long sleep after all bots ChatGPT tweeted.",
-                      lower=LONG_SLEEP_DURATION - args.long_sleep_noise,
-                      upper=LONG_SLEEP_DURATION + args.long_sleep_noise)
+                      lower=60*(LONG_SLEEP_DURATION - CONFIG['long_sleep_noise']),
+                      upper=60*(LONG_SLEEP_DURATION + CONFIG['long_sleep_noise']))
         except Exception as e:
+            print(e)
             logging.error(f"Error in main loop: {e}")
             time.sleep(60)  # Wait a minute before retrying
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Tweet summarizer for academic papers")
-    parser.add_argument('--n_per_day', type=int, default=20, help='Number of tweets per day')
-    parser.add_argument('--short_sleep_min', type=float, default=60 * 5, help='Minimum short sleep duration in seconds')
-    parser.add_argument('--short_sleep_max', type=float, default=60 * 7,
-                        help='Maximum short sleep duration in seconds')
-    parser.add_argument('--long_sleep_noise', type=float, default=60 * 3,
-                        help='Noise for long sleep duration in seconds')
-    args = parser.parse_args()
-    main(args)
+    main()
