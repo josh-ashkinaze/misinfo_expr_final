@@ -6,10 +6,24 @@ Description: Main script for messaging people.
 
 ToDo
 
-Sub in the script to read msgs from input file
+
+ToDo 1: Msg followers [by Thursday EOD]
+
+counter = 0
+while experiment_not_done
+    ToDo 1.1: if counter % gpt_mod==0:
+        do the chatgpt stuff
+    else:
+        ToDO 1.2: check who wasnt msgd and return as list
+        for each alive bot:
+            pick a follower from the list
+            msg them
+            ToDo 1.3: log the result
+            remove them from the list
+
+More granular exception stuff [by Friday EOD]
 """
 
-import argparse
 import logging
 import os
 import random
@@ -19,7 +33,6 @@ import tweepy
 from google.cloud import bigquery
 import math
 import json
-import pytz
 
 
 from helpers import log_sleep, get_chatgpt_tweet, parse_arxiv_urls, clean_chatgpt_tweet, load_credentials, read_config
