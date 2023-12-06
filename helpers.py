@@ -13,6 +13,7 @@ from google.oauth2 import service_account
 from bs4 import BeautifulSoup
 from openai import OpenAI
 from datetime import datetime, timedelta
+import yaml
 
 with open('secrets.json') as json_file:
     secrets = json.load(json_file)
@@ -55,6 +56,14 @@ def log_sleep(msg, lower, upper):
     time.sleep(amount)
     return amount
 
+
+def read_config(file_path):
+    with open(file_path, 'r') as file:
+        yaml_file = yaml.safe_load(file)
+        yaml_file['short_sleep_seconds'] = yaml_file['short_sleep']*60
+        yaml_file['short_sleep_noise_seconds'] = yaml_file['short_sleep_noise']*60
+        yaml_file['long_sleep_noise_seconds'] = yaml_file['long_sleep_noise']*60
+        return yaml_file
 ######################################
 ######################################
 

@@ -1,5 +1,5 @@
 # Number of messages per day
-n_per_day: 1
+n_per_day: 40
 
 # Short sleep
 short_sleep: 5
@@ -9,3 +9,6 @@ short_sleep_noise: 1
 
 # Long sleep noise in minutes
 long_sleep_noise: 3
+
+# is_test
+is_test: False

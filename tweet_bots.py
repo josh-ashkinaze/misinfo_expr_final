@@ -19,8 +19,7 @@ import tweepy
 from google.cloud import bigquery
 import math
 import json
-import yaml
-
+import pytz
 
 
 from helpers import log_sleep, get_chatgpt_tweet, parse_arxiv_urls, clean_chatgpt_tweet, load_credentials, read_config
@@ -40,7 +39,9 @@ with open('secrets.json') as json_file:
 BG_CREDS, TWITTER_USERNAMES = load_credentials("secrets.json")
 BIGQUERY_CLIENT = bigquery.Client(credentials=BG_CREDS, project=BG_CREDS.project_id)
 BOT_TABLE_ID = 'twitexpr.twit.bots'
+EDGE_TABLE_ID = 'twitexpr.twit.edges'
 CONFIG = read_config("config.yaml")
+assert CONFIG['is_test'] is True, "This script is not ready for production yet."
 
 def post_tweet(account_info, post_text):
     """
@@ -202,8 +203,7 @@ def calc_long_sleep_duration(N_PER_DAY, alive_bots, short_sleep):
     """
     daily_seconds = 60*60*24
 
-    # sum short sleeps in seconds
-    sum_short_sleeps = 60 * short_sleep * N_PER_DAY * len(alive_bots)
+    sum_short_sleeps = short_sleep * N_PER_DAY * len(alive_bots)
 
     available_daily_seconds = daily_seconds - sum_short_sleeps
     long_sleep_duration = math.ceil(available_daily_seconds / N_PER_DAY)
@@ -228,7 +228,7 @@ def main():
         alive_bot_usernames = parse_bot_statuses(get_bot_statuses())
         logging.info(f"Alive bots: {alive_bot_usernames}")
         alive_bot_info = {username: twitter_accounts[username] for username in alive_bot_usernames}
-        LONG_SLEEP_DURATION = calc_long_sleep_duration(N_PER_DAY, alive_bot_usernames, CONFIG['short_sleep'])
+        LONG_SLEEP_DURATION = calc_long_sleep_duration(N_PER_DAY, alive_bot_usernames, CONFIG['short_sleep_seconds'])
         try:
             # Scrape arxiv preprints for misinfo and post tweet
             logging.info(f"Starting tweet {MSGS_ATTEMPTED + 1} of {N_PER_DAY}")
@@ -244,17 +244,16 @@ def main():
                 account_info = alive_bot_info[account]
                 logging.info(f"Tweeting from {account_info['username']}")
                 log_sleep(msg="Short sleep before this bot ChatGPT tweets.",
-                          lower=60*(CONFIG['short_sleep'] - CONFIG['short_sleep_noise']),
-                          upper=60*(CONFIG['short_sleep'] + CONFIG['short_sleep_noise']))
+                          lower=CONFIG['short_sleep_seconds'] - CONFIG['short_sleep_noise_seconds'],
+                          upper=CONFIG['short_sleep_seconds'] + CONFIG['short_sleep_noise_seconds'])
                 status = post_tweet(account_info, chatgpt_tweet)
                 log_bot_status(account_info['username'], status)
 
             MSGS_ATTEMPTED += 1
             log_sleep(msg="Long sleep after all bots ChatGPT tweeted.",
-                      lower=60*(LONG_SLEEP_DURATION - CONFIG['long_sleep_noise']),
-                      upper=60*(LONG_SLEEP_DURATION + CONFIG['long_sleep_noise']))
+                        lower=LONG_SLEEP_DURATION - CONFIG['long_sleep_noise_seconds'],
+                          upper=LONG_SLEEP_DURATION + CONFIG['long_sleep_noise_seconds'])
         except Exception as e:
-            print(e)
             logging.error(f"Error in main loop: {e}")
             time.sleep(60)  # Wait a minute before retrying
 
