@@ -228,8 +228,7 @@ def calc_long_sleep_duration(N_PER_DAY, alive_bots, short_sleep):
 
 
 def return_row(df, is_test):
-    data_dict = {}
-    row = random.sample(df, 1)
+    row = random.sample(df.to_dict('records'), 1)[0]
     if is_test:
         return row['fake_msg']
     else:
@@ -249,8 +248,6 @@ def main():
     logging.info(f"Starting up with args {CONFIG}")
     N_PER_DAY = CONFIG['n_per_day']
     twitter_accounts = secrets['twitter_accounts']
-    if CONFIG['is_test']:
-        twitter_accounts = {twitter_accounts['UmichMisinfoObs']}
     MSGS_ATTEMPTED = 0
 
     while MSGS_ATTEMPTED <= N_PER_DAY:
@@ -296,7 +293,8 @@ def main():
             try:
                 logging.info(f"Starting experiment tweet (total tweet # {MSGS_ATTEMPTED + 1}) of {N_PER_DAY}")
                 for account in alive_bot_info:
-                    account_info = alive_bot_info[account]
+                    print(account)
+                    account_info = alive_bot_info[account] if not CONFIG['is_test'] else alive_bot_info['UmichMisinfoObs']
                     logging.info(f"Tweeting from {account_info['username']}")
                     msg = return_row(MSGS, CONFIG['is_test'])
                     logging.info("Status to tweet is: " + str(msg))
