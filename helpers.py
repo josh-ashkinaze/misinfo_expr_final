@@ -60,6 +60,8 @@ def log_sleep(msg, lower, upper):
 def read_config(file_path):
     with open(file_path, 'r') as file:
         yaml_file = yaml.safe_load(file)
+        if yaml_file['is_test'] is False:
+            raise ValueError("This script is not ready for production yet.")
         yaml_file['gpt_mod'] = int(1/yaml_file['gpt_percent'])
         yaml_file['short_sleep_seconds'] = yaml_file['short_sleep']*60
         yaml_file['short_sleep_noise_seconds'] = yaml_file['short_sleep_noise']*60

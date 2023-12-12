@@ -7,7 +7,7 @@ Description: Main script for messaging people.
 ToDo
 
 
-ToDo 1: Msg followers [by Thursday EOD]
+ToDo 1: Msg followers
 
 counter = 0
 while experiment_not_done
@@ -33,6 +33,8 @@ import tweepy
 from google.cloud import bigquery
 import math
 import json
+import random
+import pandas as pd
 
 
 from helpers import log_sleep, get_chatgpt_tweet, parse_arxiv_urls, clean_chatgpt_tweet, load_credentials, read_config
@@ -54,6 +56,7 @@ BIGQUERY_CLIENT = bigquery.Client(credentials=BG_CREDS, project=BG_CREDS.project
 BOT_TABLE_ID = 'twitexpr.twit.bots'
 EDGE_TABLE_ID = 'twitexpr.twit.edges'
 CONFIG = read_config("config.yaml")
+MSGS = pd.read_csv("pre_experiment/final_edges.csv")
 assert CONFIG['is_test'] is True, "This script is not ready for production yet."
 
 def post_tweet(account_info, post_text):
@@ -223,6 +226,19 @@ def calc_long_sleep_duration(N_PER_DAY, alive_bots, short_sleep):
 
     return long_sleep_duration
 
+
+def return_row(df, is_test):
+    data_dict = {}
+    row = random.sample(df, 1)
+    if is_test:
+        return row['fake_msg']
+    else:
+        raise NotImplementedError("This function is not ready for production yet.")
+
+
+
+
+
 def main():
     """
     Main function to run the script.
@@ -233,42 +249,70 @@ def main():
     logging.info(f"Starting up with args {CONFIG}")
     N_PER_DAY = CONFIG['n_per_day']
     twitter_accounts = secrets['twitter_accounts']
+    if CONFIG['is_test']:
+        twitter_accounts = {twitter_accounts['UmichMisinfoObs']}
     MSGS_ATTEMPTED = 0
 
     while MSGS_ATTEMPTED <= N_PER_DAY:
+
 
         # Get bot statuses
         alive_bot_usernames = parse_bot_statuses(get_bot_statuses())
         logging.info(f"Alive bots: {alive_bot_usernames}")
         alive_bot_info = {username: twitter_accounts[username] for username in alive_bot_usernames}
         LONG_SLEEP_DURATION = calc_long_sleep_duration(N_PER_DAY, alive_bot_usernames, CONFIG['short_sleep_seconds'])
-        try:
-            # Scrape arxiv preprints for misinfo and post tweet
-            logging.info(f"Starting tweet {MSGS_ATTEMPTED + 1} of {N_PER_DAY}")
-            articles = parse_arxiv_urls()
-            to_tweet = random.choice(articles)
-            abstract, title, link = to_tweet['abstract'], to_tweet['title'], to_tweet['link']
-            chatgpt_tweet = clean_chatgpt_tweet(get_chatgpt_tweet(abstract))
-            chatgpt_tweet = f"{chatgpt_tweet}\nRead more: {link}"
-            if not chatgpt_tweet:
-                raise ValueError("ChatGPT tweet generation failed")
 
-            for account in alive_bot_info:
-                account_info = alive_bot_info[account]
-                logging.info(f"Tweeting from {account_info['username']}")
-                log_sleep(msg="Short sleep before this bot ChatGPT tweets.",
-                          lower=CONFIG['short_sleep_seconds'] - CONFIG['short_sleep_noise_seconds'],
-                          upper=CONFIG['short_sleep_seconds'] + CONFIG['short_sleep_noise_seconds'])
-                status = post_tweet(account_info, chatgpt_tweet)
-                log_bot_status(account_info['username'], status)
+        if random.random() <= CONFIG['gpt_percent']:
 
-            MSGS_ATTEMPTED += 1
-            log_sleep(msg="Long sleep after all bots ChatGPT tweeted.",
-                        lower=LONG_SLEEP_DURATION - CONFIG['long_sleep_noise_seconds'],
+            # Do chatgpt tweet
+            try:
+                # Scrape arxiv preprints for misinfo and post tweet
+                logging.info(f"Starting tweet {MSGS_ATTEMPTED + 1} of {N_PER_DAY}")
+                articles = parse_arxiv_urls()
+                to_tweet = random.choice(articles)
+                abstract, title, link = to_tweet['abstract'], to_tweet['title'], to_tweet['link']
+                chatgpt_tweet = clean_chatgpt_tweet(get_chatgpt_tweet(abstract))
+                chatgpt_tweet = f"{chatgpt_tweet}\nRead more: {link}"
+                if not chatgpt_tweet:
+                    raise ValueError("ChatGPT tweet generation failed")
+
+                for account in alive_bot_info:
+                    account_info = alive_bot_info[account]
+                    logging.info(f"Tweeting from {account_info['username']}")
+                    log_sleep(msg="Short sleep before this bot ChatGPT tweets.",
+                              lower=CONFIG['short_sleep_seconds'] - CONFIG['short_sleep_noise_seconds'],
+                              upper=CONFIG['short_sleep_seconds'] + CONFIG['short_sleep_noise_seconds'])
+                    status = post_tweet(account_info, chatgpt_tweet)
+                    log_bot_status(account_info['username'], status)
+
+                MSGS_ATTEMPTED += 1
+                log_sleep(msg="Long sleep after all bots ChatGPT tweeted.",
+                            lower=LONG_SLEEP_DURATION - CONFIG['long_sleep_noise_seconds'],
+                              upper=LONG_SLEEP_DURATION + CONFIG['long_sleep_noise_seconds'])
+            except Exception as e:
+                logging.error(f"Error in main loop: {e}")
+                time.sleep(60)  # Wait a minute before retrying
+        else:
+            try:
+                logging.info(f"Starting experiment tweet (total tweet # {MSGS_ATTEMPTED + 1}) of {N_PER_DAY}")
+                for account in alive_bot_info:
+                    account_info = alive_bot_info[account]
+                    logging.info(f"Tweeting from {account_info['username']}")
+                    msg = return_row(MSGS, CONFIG['is_test'])
+                    logging.info("Status to tweet is: " + str(msg))
+                    log_sleep(msg="Short sleep before this bot experiment tweets.",
+                              lower=CONFIG['short_sleep_seconds'] - CONFIG['short_sleep_noise_seconds'],
+                              upper=CONFIG['short_sleep_seconds'] + CONFIG['short_sleep_noise_seconds'])
+                    #status = post_tweet(account_info, msg)
+                    log_bot_status(account_info['username'], "success")
+
+                MSGS_ATTEMPTED += 1
+                log_sleep(msg="Long sleep after all bots ChatGPT tweeted.",
+                          lower=LONG_SLEEP_DURATION - CONFIG['long_sleep_noise_seconds'],
                           upper=LONG_SLEEP_DURATION + CONFIG['long_sleep_noise_seconds'])
-        except Exception as e:
-            logging.error(f"Error in main loop: {e}")
-            time.sleep(60)  # Wait a minute before retrying
+            except Exception as e:
+                logging.error(f"Error in main loop: {e}")
+                time.sleep(60)  # Wait a minute before retrying
 
 
 if __name__ == "__main__":
