@@ -301,8 +301,9 @@ def main():
                     log_sleep(msg="Short sleep before this bot experiment tweets.",
                               lower=CONFIG['short_sleep_seconds'] - CONFIG['short_sleep_noise_seconds'],
                               upper=CONFIG['short_sleep_seconds'] + CONFIG['short_sleep_noise_seconds'])
-                    #status = post_tweet(account_info, msg)
-                    log_bot_status(account_info['username'], "success")
+                    status = post_tweet(account_info, msg)
+                    logging.info("Status of tweet is: " + str(status))
+                    log_bot_status(account_info['username'], status)
 
                 MSGS_ATTEMPTED += 1
                 log_sleep(msg="Long sleep after all bots ChatGPT tweeted.",
